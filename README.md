@@ -3,7 +3,9 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 
 ## Collaboration Tool
 
-[NSMG Hackfest Slack](http://nsmg-hackfest.slack.com)
+[NSMG Hackfest Slack](http://nsmg-hackfest.slack.com)<br>
+[One Drive](https://1drv.ms/f/s!AosfFsO-w03gjnOhsZl1McXhzLP4)
+
 
 ## Azure Services
 
@@ -14,4 +16,7 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 [SQL Database](https://docs.microsoft.com/ko-kr/azure/sql-database/sql-database-technical-overview)<br>
 [Azure Functions](https://docs.microsoft.com/ko-kr/azure/azure-functions/functions-overview)<br>
 [Cosmos DB](https://docs.microsoft.com/ko-kr/azure/cosmos-db/introduction)
+
+## 관련 문서 
+
 
