@@ -12,10 +12,10 @@ namespace IoTHubDataSender
     class Program
     {
         //private static System.Timers.Timer SensorTimer;
-        private const string DeviceConnectionString = "HostName=NSMGIothub.azure-devices.net;SharedAccessKeyName=device;SharedAccessKey=34N01FIfQTMF70HXaFZ66JnWUkBM4xrAckSFUy7zTFQ=";
-        private const string DeviceID = "Device1";
+        private const string DeviceConnectionString = "HostName=NSMGHub.azure-devices.net;DeviceId=nsmg01;SharedAccessKey=tO951BbAVTN1LpcDteSOZMF3+uaQmiTfy0F75NUfFhM=";
+        private const string DeviceID = "nsmg01";
         private static DummySensor Sensor = new DummySensor();
-        private static int Duration = 0;
+        private static int Duration = 1000;
         private static int InstanceCount = 0;
         private string JsonFIlename = "";
 
@@ -23,13 +23,13 @@ namespace IoTHubDataSender
 
         static void Main(string[] args)
         {
-            if(args.Length < 2)
+            if (args.Length < 2)
             {
                 Console.WriteLine("Please use parameta ex)IoTHubDataSender {Duration} {Instance count}");
                 return;
             }
 
-            if(!Int32.TryParse(args[0], out Duration))
+            if (!Int32.TryParse(args[0], out Duration))
             {
                 Console.WriteLine("Incorret Duration type ex) 1000");
                 return;
@@ -41,10 +41,10 @@ namespace IoTHubDataSender
                 return;
             }
 
-            for(int i=0;i<InstanceCount;i++)
+            for (int i = 0; i < InstanceCount; i++)
                 SetTimer();
 
-            SensorDevice = DeviceClient.CreateFromConnectionString(DeviceConnectionString, "Device1", TransportType.Mqtt_Tcp_Only);
+            SensorDevice = DeviceClient.CreateFromConnectionString(DeviceConnectionString, TransportType.Mqtt_Tcp_Only);
 
             if (SensorDevice == null)
             {
@@ -63,7 +63,7 @@ namespace IoTHubDataSender
         {
             string json = Newtonsoft.Json.JsonConvert.SerializeObject(Sensor.GetWetherData(DeviceID));
 
-            Console.WriteLine(json);
+            //Console.WriteLine(json);
 
             Message eventMessage = new Message(Encoding.UTF8.GetBytes(json));
             await SensorDevice.SendEventAsync(eventMessage);
@@ -95,9 +95,9 @@ namespace IoTHubDataSender
 
         private async static void SensorTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            Console.WriteLine("The Elapsed event was raised at {0:HH:mm:ss.fff}", e.SignalTime);
+            //Console.WriteLine("The Elapsed event was raised at {0:HH:mm:ss.fff}", e.SignalTime);
             await SendEvent();
-            await ReceiveCommands();
+            //await ReceiveCommands();
         }
     }
 }
