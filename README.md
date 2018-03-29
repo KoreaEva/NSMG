@@ -19,9 +19,17 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 ## Artchitecture
 
 ## 기술 검증
-![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Artchitecture-writing.JPG?raw=true)<br>
+![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Artchitecture.png?raw=true)<br>
 
-### 1. IoT Hub Dummy
+### 1. IoT Hub Dummy --> Android Client
+
+IoT Hub Dummy를 사용해서 대량의 데이터를 전송하는 것을 시도했으나 충분한 트래픽을 발생시키는 데에는 1개의 클라이언트에서 한계가 있었고 또 네트웍등의 문제가 발생하는 것을 확인했다. 
+ 또 IoT Hub가 비용적인 문제와 좀 더 유연한 확장을 위해서 Azure Storage Account에서 제공하는 Queue를 사용하게 되면서 아래의 Iot Hub Dummy는 사용하지 않게 되었다. 대신 Android Client를 만들어서 테스트하게 되었으며 Android Client는 Queue에 직접 통신하게 되었다. 
+
+ #### Android Client
+ <내용 추가>
+
+ #### IoT Hub Dummy (사용하지 않음)
 
 테스트르 위해서 충분한 숫자의 데이터 패킷을 발생시키기 위한 더미 소스 입니다.<br> 
 [IoTHub Sensor Data Dummy C# Source Code](https://github.com/KoreaEva/NSMG/tree/master/Samples/IoTHubDataSender)<br>
@@ -35,7 +43,60 @@ IoTHubDataSender 5000 1<br>
 WeatherModel.cs //데이터 모델<br>
 DummySensor.cs  //난수 발생기 <br>
 
+### 2. Azure Storage Queue
 
+Azure Storage Queue와 관련된 자세한 내용은 [https://azure.microsoft.com/ko-kr/services/storage/queues/](https://azure.microsoft.com/ko-kr/services/storage/queues/
+)에서 확인 할 수 있다. 
+
+![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/queues.png?raw=true)<br>
+
+여기서는 초당 5000개 이상의 요청을 처리하기 위해서 10개의 Queue를 사용 하고 있다. 그리고 각각의 Queue에는 Queue Trigger 담당하는 Azure Functions들을 연결해서 들어오는 요청을 처리 할 수 있게 했다. 
+
+Queue의 제약은 아래와 같다. 
+Azure Storage Account 초당 20,000 호출<br>
+Azure Storage Queue 초당 2,000 호출<br>
+
+```
+
+### 3. Azure Functions (Queue Trigger)
+
+### 4. MySQL to SQL data migration 
+
+### 5. SQL Utility library
+
+### 6. Log Analytics
+
+### 5. Cosmos DB
+
+개발 참조링크
+[https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started](https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started)<br>
+
+### 7. Azure Functions (Http Trigger)
+
+
+
+## 프로젝트 코드
+
+## Collaboration Tool
+
+[NSMG Hackfest Slack](http://nsmg-hackfest.slack.com)<br>
+[One Drive](https://1drv.ms/f/s!AosfFsO-w03gjnOhsZl1McXhzLP4)
+
+
+## Azure Services
+
+[Azure Web App](https://docs.microsoft.com/ko-kr/azure/app-service/app-service-web-overview)<br>
+[IoT Hub](https://docs.microsoft.com/ko-kr/azure/iot-hub/)<br>
+[Stream Analytics Job](https://docs.microsoft.com/ko-kr/azure/stream-analytics/)<br>
+[Azure Storage Account](https://docs.microsoft.com/ko-kr/azure/storage/common/storage-introduction)<br>
+[SQL Database](https://docs.microsoft.com/ko-kr/azure/sql-database/sql-database-technical-overview)<br>
+[Azure Functions](https://docs.microsoft.com/ko-kr/azure/azure-functions/functions-overview)<br>
+[Cosmos DB](https://docs.microsoft.com/ko-kr/azure/cosmos-db/introduction)
+
+## 관련 문서 
+
+
+## 사용을 예상했으나 사용되지 않은 서비스 
 
 ### 2. IoT Hub Trigger
 
@@ -99,32 +160,3 @@ Timer setting 방법 [https://gs.saro.me/#!m=elec&jn=866](https://gs.saro.me/#!m
             log.Info($"C# Timer trigger function executed at: {DateTime.Now}");
         }
     }
-```
-
-### 5. Cosmos DB
-
-개발 참조링크
-[https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started](https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started)<br>
-
-
-## 프로젝트 코드
-
-## Collaboration Tool
-
-[NSMG Hackfest Slack](http://nsmg-hackfest.slack.com)<br>
-[One Drive](https://1drv.ms/f/s!AosfFsO-w03gjnOhsZl1McXhzLP4)
-
-
-## Azure Services
-
-[Azure Web App](https://docs.microsoft.com/ko-kr/azure/app-service/app-service-web-overview)<br>
-[IoT Hub](https://docs.microsoft.com/ko-kr/azure/iot-hub/)<br>
-[Stream Analytics Job](https://docs.microsoft.com/ko-kr/azure/stream-analytics/)<br>
-[Azure Storage Account](https://docs.microsoft.com/ko-kr/azure/storage/common/storage-introduction)<br>
-[SQL Database](https://docs.microsoft.com/ko-kr/azure/sql-database/sql-database-technical-overview)<br>
-[Azure Functions](https://docs.microsoft.com/ko-kr/azure/azure-functions/functions-overview)<br>
-[Cosmos DB](https://docs.microsoft.com/ko-kr/azure/cosmos-db/introduction)
-
-## 관련 문서 
-
-
