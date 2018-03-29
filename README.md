@@ -48,15 +48,13 @@ DummySensor.cs  //난수 발생기 <br>
 Azure Storage Queue와 관련된 자세한 내용은 [https://azure.microsoft.com/ko-kr/services/storage/queues/](https://azure.microsoft.com/ko-kr/services/storage/queues/
 )에서 확인 할 수 있다. 
 
-![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/queues.png?raw=true)<br>
+![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Queues.png?raw=true)<br>
 
 여기서는 초당 5000개 이상의 요청을 처리하기 위해서 10개의 Queue를 사용 하고 있다. 그리고 각각의 Queue에는 Queue Trigger 담당하는 Azure Functions들을 연결해서 들어오는 요청을 처리 할 수 있게 했다. 
 
 Queue의 제약은 아래와 같다. 
 Azure Storage Account 초당 20,000 호출<br>
 Azure Storage Queue 초당 2,000 호출<br>
-
-```
 
 ### 3. Azure Functions (Queue Trigger)
 
