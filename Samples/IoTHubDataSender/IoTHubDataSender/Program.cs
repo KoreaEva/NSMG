@@ -5,50 +5,34 @@ using System.Text;
 using System.Threading.Tasks;
 
 using System.Timers;
-using Microsoft.Azure.Devices.Client;
+using Microsoft.Azure.EventHubs;
 
 namespace IoTHubDataSender
 {
     class Program
     {
         //private static System.Timers.Timer SensorTimer;
-        private const string DeviceConnectionString = "HostName=NSMGHub.azure-devices.net;DeviceId=nsmg01;SharedAccessKey=tO951BbAVTN1LpcDteSOZMF3+uaQmiTfy0F75NUfFhM=";
-        private const string DeviceID = "nsmg01";
         private static DummySensor Sensor = new DummySensor();
         private static int Duration = 1000;
-        private static int InstanceCount = 0;
-        private string JsonFIlename = "";
 
-        private static DeviceClient SensorDevice = null;
+        private const string EventHubConnectionString = "Endpoint=sb://nsmgeventhub.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=uqC11Xtp5syZy0QF7jFGwDfJO4wgEaCxYyuX5Khrr0U=";
+        private const string EventHub = "wifi";
+        private static EventHubClient eventHubClient;
 
         static void Main(string[] args)
         {
-            if (args.Length < 2)
+            var connectionStringBuilder = new EventHubsConnectionStringBuilder(EventHubConnectionString)
             {
-                Console.WriteLine("Please use parameta ex)IoTHubDataSender {Duration} {Instance count}");
-                return;
-            }
+                EntityPath = EventHub
+            };
 
-            if (!Int32.TryParse(args[0], out Duration))
+            eventHubClient = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
+
+            SetTimer();
+
+            if (eventHubClient == null)
             {
-                Console.WriteLine("Incorret Duration type ex) 1000");
-                return;
-            }
-
-            if (!Int32.TryParse(args[1], out InstanceCount))
-            {
-                Console.WriteLine("Incorret Instance Count type ex) 1000");
-                return;
-            }
-
-            for (int i = 0; i < InstanceCount; i++)
-                SetTimer();
-
-            SensorDevice = DeviceClient.CreateFromConnectionString(DeviceConnectionString, TransportType.Mqtt_Tcp_Only);
-
-            if (SensorDevice == null)
-            {
-                Console.WriteLine("Failed to create DeviceClient!");
+                Console.WriteLine("Failed to create EventHub Client!");
                 //SensorTimer.Stop();
             }
 
@@ -61,28 +45,10 @@ namespace IoTHubDataSender
 
         static async Task SendEvent()
         {
-            string json = Newtonsoft.Json.JsonConvert.SerializeObject(Sensor.GetWetherData(DeviceID));
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(Sensor.GetWetherData("Device1"));
 
-            //Console.WriteLine(json);
-
-            Message eventMessage = new Message(Encoding.UTF8.GetBytes(json));
-            await SensorDevice.SendEventAsync(eventMessage);
-        }
-
-        static async Task ReceiveCommands()
-        {
-            Message receivedMessage;
-            string messageData;
-
-            receivedMessage = await SensorDevice.ReceiveAsync(TimeSpan.FromSeconds(1));
-
-            if (receivedMessage != null)
-            {
-                messageData = Encoding.ASCII.GetString(receivedMessage.GetBytes());
-                Console.WriteLine("\t{0}> Received message: {1}", DateTime.Now.ToLocalTime(), messageData);
-
-                await SensorDevice.CompleteAsync(receivedMessage);
-            }
+            await eventHubClient.SendAsync(new EventData(Encoding.UTF8.GetBytes(json)));
+            Console.WriteLine(json);
         }
 
         private static void SetTimer()
@@ -95,9 +61,8 @@ namespace IoTHubDataSender
 
         private async static void SensorTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            //Console.WriteLine("The Elapsed event was raised at {0:HH:mm:ss.fff}", e.SignalTime);
+            Console.WriteLine("The Elapsed event was raised at {0:HH:mm:ss.fff}", e.SignalTime);
             await SendEvent();
-            //await ReceiveCommands();
         }
     }
 }

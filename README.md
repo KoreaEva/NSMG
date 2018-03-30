@@ -21,6 +21,73 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 ## 기술 검증
 ![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Artchitecture.png?raw=true)<br>
 
+### 1. EventHub
+
+1초에 5000개 이상의 요청을 안정적으로 처리하기 하기 위해서 IoT Hub와 EventHub 그리고 10개의 Azure Storage Queue에 분산처리 하는 방법 등 다양한 방법이 고려되었다. 이 중에서도 초기에 EventHub는 모바일 디바이스쪽으로 Callback할 수 있는 방법이 제공되지 않아서 제외되었고 IoT Hub의 경우 비용에 대한 문제로 제외되었다. Queue를 사용하는 방식으로 거의 결졍되었다가 디바이스 방향으로의 Callback을 Google이 제공하는 push notification으로 처리하게 되면서 Event Hub를 사용하기로 결정되었다. 
+
+EventHub는 Standard 버전의 경우 1개의 인스턴스가 초당 1000개의 메시지를 처리 할 수 있다. 따라서 10개를 사용하면 무난하게 요구사항을 맞출 수 있을 것으로 기대 된다. 
+![EventHub](https://github.com/KoreaEva/NSMG/blob/master/Images/EventHubs.png?raw=true)<br>
+
+### 3. Azure Functions (EventHub Trigger)
+
+EventHub를 사용하게 되면서 Azure Functions도 역시 EventHub Trigger를 사용하게 되었다. 
+
+```csharp
+    public static class EventHubWifi
+    {
+        [FunctionName("EventHubWifi")]
+        public static void Run([EventHubTrigger("wifi", Connection = "WIFI")]string myEventHubMessage, TraceWriter log)
+        {
+            log.Info($"C# Event Hub trigger function processed a message: {myEventHubMessage}");
+        }
+    }
+```
+Azure Functions를 사용할 때에 주의 할 점은 실제 가동중인 Azure Functions와 Local에서 개발중인 Azure Functions의 storage를 같은 서비스로 지정하게 되면 Connection limit가 초과 되었다는 메시지와 함께 실행되지 않는 경우가 있다. 
+
+### 4. MySQL to SQL data migration 
+
+### 5. SQL Utility library
+
+### 6. Cosmos DB
+
+### 7. Azure Batch
+
+### 8. Azure Search
+
+### 9. Azure Functions(Http Trigger)
+
+개발 참조링크
+[https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started](https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started)<br>
+
+### 7. Azure Functions (Http Trigger)
+
+
+
+## 프로젝트 코드
+
+## Collaboration Tool
+
+[NSMG Hackfest Slack](http://nsmg-hackfest.slack.com)<br>
+[One Drive](https://1drv.ms/f/s!AosfFsO-w03gjnOhsZl1McXhzLP4)
+
+
+## Azure Services
+
+[Azure Web App](https://docs.microsoft.com/ko-kr/azure/app-service/app-service-web-overview)<br>
+[IoT Hub](https://docs.microsoft.com/ko-kr/azure/iot-hub/)<br>
+[Stream Analytics Job](https://docs.microsoft.com/ko-kr/azure/stream-analytics/)<br>
+[Azure Storage Account](https://docs.microsoft.com/ko-kr/azure/storage/common/storage-introduction)<br>
+[SQL Database](https://docs.microsoft.com/ko-kr/azure/sql-database/sql-database-technical-overview)<br>
+[Azure Functions](https://docs.microsoft.com/ko-kr/azure/azure-functions/functions-overview)<br>
+[Cosmos DB](https://docs.microsoft.com/ko-kr/azure/cosmos-db/introduction)
+
+## 관련 문서 
+
+
+## 사용을 예상했으나 사용되지 않은 서비스 
+
+
+
 ### 1. IoT Hub Dummy --> Android Client
 
 IoT Hub Dummy를 사용해서 대량의 데이터를 전송하는 것을 시도했으나 충분한 트래픽을 발생시키는 데에는 1개의 클라이언트에서 한계가 있었고 또 네트웍등의 문제가 발생하는 것을 확인했다. 
@@ -55,46 +122,6 @@ Azure Storage Queue와 관련된 자세한 내용은 [https://azure.microsoft.co
 Queue의 제약은 아래와 같다. 
 Azure Storage Account 초당 20,000 호출<br>
 Azure Storage Queue 초당 2,000 호출<br>
-
-### 3. Azure Functions (Queue Trigger)
-
-### 4. MySQL to SQL data migration 
-
-### 5. SQL Utility library
-
-### 6. Log Analytics
-
-### 5. Cosmos DB
-
-개발 참조링크
-[https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started](https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started)<br>
-
-### 7. Azure Functions (Http Trigger)
-
-
-
-## 프로젝트 코드
-
-## Collaboration Tool
-
-[NSMG Hackfest Slack](http://nsmg-hackfest.slack.com)<br>
-[One Drive](https://1drv.ms/f/s!AosfFsO-w03gjnOhsZl1McXhzLP4)
-
-
-## Azure Services
-
-[Azure Web App](https://docs.microsoft.com/ko-kr/azure/app-service/app-service-web-overview)<br>
-[IoT Hub](https://docs.microsoft.com/ko-kr/azure/iot-hub/)<br>
-[Stream Analytics Job](https://docs.microsoft.com/ko-kr/azure/stream-analytics/)<br>
-[Azure Storage Account](https://docs.microsoft.com/ko-kr/azure/storage/common/storage-introduction)<br>
-[SQL Database](https://docs.microsoft.com/ko-kr/azure/sql-database/sql-database-technical-overview)<br>
-[Azure Functions](https://docs.microsoft.com/ko-kr/azure/azure-functions/functions-overview)<br>
-[Cosmos DB](https://docs.microsoft.com/ko-kr/azure/cosmos-db/introduction)
-
-## 관련 문서 
-
-
-## 사용을 예상했으나 사용되지 않은 서비스 
 
 ### 2. IoT Hub Trigger
 
@@ -158,3 +185,8 @@ Timer setting 방법 [https://gs.saro.me/#!m=elec&jn=866](https://gs.saro.me/#!m
             log.Info($"C# Timer trigger function executed at: {DateTime.Now}");
         }
     }
+```
+
+### 6. Log Analytics
+
+일반적인 용도로 사용할 수 없어서 제외되었다.
