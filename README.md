@@ -50,17 +50,89 @@ Azure Functions를 사용할 때에 주의 할 점은 실제 가동중인 Azure 
 
 ### 6. Cosmos DB
 
+Cosmos DB에 저장하기 위해서는 Database를 먼저 생성하고 JSON Document를 저장할 수 있는 Collection을 생성해야 한다. 실제 저장은 Collection에 이루어지는데 Collection도 10Gbyte 한계가 있는 버전과 Unlimited 버전이 존재한다. Unlimited을 사용할 때에는 사실상 RU의 제약이 없이 사용할 수 있으며 또 RU의 제한을 넘어서 사용하는 것도 별도의 요청을 통해서 가능하게 되어 있다. 반대로 10Gbyte의 한계가 있는 버전의 경우에는 10,000 RU가 한계다. 그래서 NSMG의 요구사항을 수용하기 위해서는 Unlimited Collection을 사용하게 되었다. 
+
+```csharp
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Host;
+using Microsoft.Azure.WebJobs.ServiceBus;
+
+using System;
+using System.Net;
+using Microsoft.Azure.Documents;
+using Microsoft.Azure.Documents.Client;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+namespace NSMGFunctions
+{
+    public static class EventHubWifi
+    {
+        private const string EndpointUrl = "<EndPoint URL>";
+        private const string PrimaryKey = "<Primary Key>";
+        private static DocumentClient client = null;
+        private static string DatabaseName = "<Database Name>";
+        private static string DataCollectionName = "<Collection Name>";
+
+        [FunctionName("EventHubWifi")]
+        public async static void Run([EventHubTrigger("wifi", Connection = "WIFI")]string myEventHubMessage, TraceWriter log)
+        {
+            try
+            {
+                client = new DocumentClient(new Uri(EndpointUrl), PrimaryKey);
+
+                // Azure Function의 효율을 위해서 Database와 Collection을 체크하고 생성하는 코드는 모두 주석처리 했다. 
+
+                //await client.CreateDatabaseIfNotExistsAsync(new Database { Id = DatabaseName });
+                //await client.CreateDocumentCollectionIfNotExistsAsync(
+                //    UriFactory.CreateDatabaseUri(DatabaseName), 
+                //    new DocumentCollection { Id = DataCollectionName },
+                //    new RequestOptions { OfferThroughput = 5000}
+                //);
+
+                string documentID = generateID();
+                JObject json = JObject.Parse(myEventHubMessage);
+
+                log.Info($"C# Event Hub trigger function processed a message: {myEventHubMessage}");
+                await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseName, DataCollectionName), json);
+                
+            }
+            catch(DocumentClientException de)
+            {
+                Exception baseException = de.GetBaseException();
+                string errorMessage = string.Format("error occurred : {0}. Message: {1},", de.StatusCode, de.Message);
+                log.Info(errorMessage);
+            }
+            catch(Exception e)
+            {
+                string errorMessage = string.Format("Message: {0},", e.Message);
+                log.Info(errorMessage);
+            }
+            finally
+            {
+
+            }
+        }
+
+        /// 문서의 고유이름 생성하기 위한 메소드
+        public static string generateID()
+        {
+            return string.Format("{0}_{1:N}", System.DateTime.Now.Ticks, Guid.NewGuid());
+        }
+    }
+}
+```
+
+Cosmos DB에 필요한 RU를 계산해 볼 수 있는 사이트 [https://www.documentdb.com/capacityplanner#](https://www.documentdb.com/capacityplanner#)<br
+
+Cosmos DB개발 참조링크
+[https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started](https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started)<br>
+
 ### 7. Azure Batch
 
 ### 8. Azure Search
 
 ### 9. Azure Functions(Http Trigger)
-
-개발 참조링크
-[https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started](https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started)<br>
-
-### 7. Azure Functions (Http Trigger)
-
 
 
 ## 프로젝트 코드
