@@ -24,7 +24,14 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 ### 1. EventHubs Client
 
  EventHub에 연결하기 위해서는 두 가지 방법 중 하나를 선택할 수 있다. 첫 번째 방법은 제공되는 패키지를 이용하는 방법이고 두 번째는 REST를 이용하는 연결 방법이다. 이번 Hackfest에서는 두 가지 방법을 모두 테스트 했다. 패키지를 이용하는 방법은 Nuget 을 사용하는 Console App으로 제작해서 테스트용 더미 클라이언트를 만드는데 사용했다. 
- 
+
+ EventHub Nuget Package [https://www.nuget.org/packages/Microsoft.Azure.EventHubs/](https://www.nuget.org/packages/Microsoft.Azure.EventHubs/)<br>
+ EventHub REST [https://docs.microsoft.com/en-us/rest/api/eventhub/](https://docs.microsoft.com/en-us/rest/api/eventhub/)<br>
+
+ 더미 클라이언트의 전체 소스는 아래 링크에서 볼 수 있다.
+ [https://github.com/KoreaEva/NSMG/tree/master/Samples/EventHubDataSender](https://github.com/KoreaEva/NSMG/tree/master/Samples/EventHubDataSender)<br>
+ 더미 클라이언트는 실제 업무에 사용되는 JSON 포멧을 발송하기 위해서 사용되었다. 
+
   REST를 사용하는 방법은 실제 Android 개발에 사용할 Library 제작에 사용 되었다. 
 
 
