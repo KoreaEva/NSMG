@@ -34,11 +34,232 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 
   REST를 사용하는 방법은 실제 Android 개발에 사용할 Library 제작에 사용 되었다. 
 
+### 2. SAS Token From Azure Function
+Azure 기반의 Mobile App 을 만들면, 처음엔 Connection String 을 사용해서 프로토타이핑을 하면 쉽고 빠르지만, 상용 서비스를 위한 앱을 만들 때에는 보안을 위해서 SAS Token 을 사용해야 한다. (Cloud Service Resource 들에 대한 접근 권한 부여를 위한 다른 방법도 있다.)
+이 과정에 있어, Mobile App 에서 REST API 로 Azure PaaS Service 에 접근하기 위한 SAS Token 을 서버 또는 브로커로 부터 생성해서 받아와야하는데, 이를 Azure Function 으로 구현하면 대단히 편하다. 실제로 Azure Function 에 Azure Storage 용 SAS Token 생성 템플릿이 있기도 하다.
+Visual Studio Community 를 사용해서 Function 의 코드를 편집할 경우 아래와 같이 하면 된다.
+1. 솔루션탐색기에서 local.settings.json 을 열어서 아래와 같은 형태로 세 줄을 추가한다.
+    "eventHubResourceUri": "https://myeventhub.servicebus.windows.net/",
+    "eventHubKeyName": "RootManageSharedAccessKey",
+    "eventHubKey": "uqC11pox5syZy9QF7jFGwDfJO4abCaCxYyuX5Khrr0U="
+2. 위의 상수 값들은 로컬 테스트에서만 사용되며, Azure Function App 에 게시한 이후에는, Function App 의 Application Settings 에서 위와 동일한 이름으로 추가한 상수가 사용된다. 
+3. eventHubResourceUri, eventHubKeyName, eventHubKey 의 값은 Azure Portal 에서 얻을 수 있다.
+4. Function 함수의 내용이 담겨 있는 .cs 파일의 내용은 아래와 같다.
+```csharp
+using System;
+using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+using System.Web;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Host;
+namespace SASTokenApp
+{
+    public static class SASTokenForEventHubs
+    {
+        [FunctionName("SASTokenForEventHubs")]
+        public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)]HttpRequestMessage req, TraceWriter log)
+        {
+            log.Info("C# HTTP trigger function processed a request.");
+            // 로컬 또는 Azure Function App 의 Application Settings 에서 가져오게될 환경변수 값.
+            string resourceUri = System.Environment.GetEnvironmentVariable("eventHubResourceUri", EnvironmentVariableTarget.Process);
+            string keyName = System.Environment.GetEnvironmentVariable("eventHubKeyName", EnvironmentVariableTarget.Process);
+            string key = System.Environment.GetEnvironmentVariable("eventHubKey", EnvironmentVariableTarget.Process);
+            
+            // Token 의 유효기간을 설정하기 위한 코드.
+            TimeSpan sinceEpoch = DateTime.UtcNow - new DateTime(1970, 1, 1);
+            var week = 60 * 60 * 24 * 365;
+            var expiry = Convert.ToString((int)sinceEpoch.TotalSeconds + week);
+            
+            // 인코딩을 거쳐서 SAS Token 생성.
+            string stringToSign = HttpUtility.UrlEncode(resourceUri) + "\n" + expiry;
+            HMACSHA256 hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key));
+            var signature = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(stringToSign)));
+            var sasToken = String.Format(CultureInfo.InvariantCulture, "SharedAccessSignature sr={0}&sig={1}&se={2}&skn={3}", HttpUtility.UrlEncode(resourceUri), HttpUtility.UrlEncode(signature), expiry, keyName);
+            return req.CreateResponse(HttpStatusCode.OK, sasToken);
+        }
+    }
+}
+```
+Azure Function 은 마이크로 서비스의 대표적인 형태이며, 실행시간 100ms 기준으로 리퀘스트 1백만번에 200원 정도 밖에 안되니 걱정 없이 써도 좋다. Token 발급만을 위해서 VM 을 두는 것은 좀 낭비일 것이다.^^
+먼저, Function 을 통해서 토큰을 받으면 아래와 같은 형태일 것이다.
+"SharedAccessSignature sr=https%3a%2f%2fmshub.servicebus.windows.net%2f&sig=PFZVab43PMsO0q9gz4%2bFsuaQq%5ff05L4M7hKVBN8DEn0%3d&se=1553339810&skn=RootManageSharedAccessKey"
+만약 Android App 에서 REST API 로 Function 을 호출해서 위의 Token 을 얻었다면 맨 앞의 " 문자와 맨 끝의 " 문자를 제거해주어야 한다. 제거 없이 바로 EventHub 에 데이터를 Post 하는 데 사용하시면 아래와 같은 오류가 발생할 것이다.
+MalformedToken: The credentials contained in the authorization header are not in the WRAP format.
+Android App 에서 Token 을 받아온 후, EventHub 로 데이터를 전송하는 코드는 아래와 같다.
+build.gradle 파일의 dependencies 에 아래를 추가해주면 okHttp 를 사용할 수 있다.
+~~~
+implementation 'com.squareup.okhttp3:okhttp:3.10.0'
+~~~
+Azure Function 및 EventHub 에 REST 로 접속하기 위한 HTTP Client 는 여러 사용자들의 이해를 돕기 위해 각각 다른 것을 사용해보았다.
+MainActivity.java
+~~~java
+public class MainActivity extends AppCompatActivity {
+    TextView textViewA;
+    HttpURLConnection conn = null;
+    final String TAG = "MainActivity";
+    String authorizationString;
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        textViewA = (TextView)findViewById(R.id.textView);
+    }
+    public void testFunctionWithPOST(View v) {
+        Thread threadA = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String query = URLEncoder.encode("mU4kdaut8IfDR5UTRA2NMCjtpMxrhKNCIv6oLeMhhW384a021HYkOw==", "utf-8");
+                    URL url = new URL("https://myfunc.azurewebsites.net/api/SASTokenForEventHubs?code="+query);
+                    conn = (HttpURLConnection)url.openConnection();
+                    if (conn != null) {
+                        conn.setConnectTimeout(10000);
+                        conn.setReadTimeout(10000);
+                        conn.setRequestMethod("POST");
+                        conn.setUseCaches(false);
+                        conn.setDoInput(true);      // InputStream From Server
+                        conn.setDoOutput(true);     // OutputStream with POST
+                        // Request Header값 셋팅
+                        conn.setRequestProperty("Content-Type", "application/json");    // 서버로 Request Body 전달시 json 일 때.
+                        //conn.setRequestProperty("Accept", "application/json");          // 서버 Response Data를 json 으로 요청.
+                        // 실제 서버로 Request 요청 하여 응답 수신.
+                        final int responseCode = conn.getResponseCode();
+                        if(responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_ACCEPTED) {
+                            Log.d(TAG,"Connection OK");
+                            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                            StringBuilder sb = new StringBuilder();
+                            String line = null;
+                            while ((line = br.readLine()) != null) {
+                                if(sb.length() > 0) {
+                                    sb.append("\n");
+                                }
+                                sb.append(line);
+                            }
+                            final String resultA = sb.toString();
+                            authorizationString = resultA.replaceAll("\"","");
+                            Log.d("Res ", authorizationString);
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    textViewA.setText(authorizationString);
+                                }
+                            });
+                        } else {
+                            Log.d(TAG,"Connection Error :" + responseCode);
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    textViewA.setText("Connection Error :" + responseCode);
+                                }
+                            });
+                        }
+                    }
+                } catch(Exception ex) {
+                    Log.d(TAG, "Exception: "+ex);
+                    ex.printStackTrace();
+                }  finally {
+                    if(conn != null) {
+                        conn.disconnect();
+                    }
+                }
+            }
+        });
+        threadA.start();
+    }
+    public void sendDataToEventHubs(View v) {
+        final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        Thread threadA = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    OkHttpClient.Builder builderA = new OkHttpClient.Builder().protocols(Arrays.asList(Protocol.HTTP_1_1));
+                    OkHttpClient clientA = builderA.build();
+                    HttpUrl.Builder urlBuilder = HttpUrl.parse("https://myeventhub.servicebus.windows.net/myhub/mes").newBuilder();
+                    String urlA = urlBuilder.build().toString();
+                    String jsonA = "{\"name\":\"mingyu\", \"age\":\"20\"}";
+                    RequestBody body = RequestBody.create(JSON, jsonA);
+                    Request request = new Request.Builder()
+                            .header("Authorization", authorizationString)
+                            .header("Content-Type", "application/json")
+                            .header("ContentType","application/atom+xml;type=entry;charset=utf-8")
+                            .url(urlA)
+                            .post(body)
+                            .build();
+                    Response response = clientA.newCall(request).execute();
+                    //Log.d("Code",""+response.code());
+                    //Log.d("Body", response.body().string());
+                    response.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        threadA.start();
+    }
+}
+~~~
+activity_main.xml
+~~~xml
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+    <Button
+        android:text="Get SAS Token"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        android:onClick="testFunctionWithPOST"
+        android:id="@+id/button" />
+    <Button
+        android:text="Send Data to Event Hubs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/button"
+        android:layout_centerHorizontal="true"
+        android:onClick="sendDataToEventHubs"
+        android:id="@+id/buttonB" />
+    <TextView
+        android:text="Function Test"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="87dp"
+        android:id="@+id/textView"
+        android:textSize="30sp"
+        android:layout_above="@+id/button"
+        android:layout_centerHorizontal="true" />
+</RelativeLayout>
+~~~
+
+### 3. EventHub
 
 1초에 5000개 이상의 요청을 안정적으로 처리하기 하기 위해서 IoT Hub와 EventHub 그리고 10개의 Azure Storage Queue에 분산처리 하는 방법 등 다양한 방법이 고려되었다. 이 중에서도 초기에 EventHub는 모바일 디바이스쪽으로 Callback할 수 있는 방법이 제공되지 않아서 제외되었고 IoT Hub의 경우 비용에 대한 문제로 제외되었다. Queue를 사용하는 방식으로 거의 결졍되었다가 디바이스 방향으로의 Callback을 Google이 제공하는 push notification으로 처리하게 되면서 Event Hub를 사용하기로 결정되었다. 
 
 EventHub는 Standard 버전의 경우 1개의 인스턴스가 초당 1000개의 메시지를 처리 할 수 있다. 따라서 10개를 사용하면 무난하게 요구사항을 맞출 수 있을 것으로 기대 된다. 
+
 ![EventHub](https://github.com/KoreaEva/NSMG/blob/master/Images/EventHubs.png?raw=true)<br>
+
+EventHub를 사용할 때 EventHub의 처리량은 충분한데 Partition에서 받아들이지 못할 수 있다. 하지만 [공식웹페이지](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-quotas)에서 제공되는 정보만으로는 1개의 Partition의 처리량을 확인 할 수 있기 때문에 일반적인 Blob Storage의 처리량을 기준으로 1개의 Partition 당 1초에 2000개 정도의 요구 사항을 처리한다고 가정해서 Partition은 4개로 설정했다. 
+
+ 2000 * 4개 = 8000 정도의 성능이 나올 것으로 기대 된다. 
+
+### 4. Stream Analytics Job
+
+EventHub 에서 제공하는 Capture기능을 사용하면 EventHub로 들어오는 데이터를 Blob storage에 백업할 수 있다. 
+
+하지만 실제로 테스트 해보니 한글이 깨지고 Line단위로 분할하는 등의 기능이 미해서 결국 중간에 Stream Analytics Job을 사용해서 저장하기로 했다.
+또 필요에 따라서 추가적인 데이터의 흐름이 필요할 수도 있어서 Stream Analytics를 사용하게 되었다. 
+
 
 ### 3. Azure Functions (EventHub Trigger)
 
