@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27428.2015
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NSMGFunc", "NSMGFunc\NSMGFunc.csproj", "{F9CB4003-E5C9-48CE-99E2-3FDADD3A77EE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F9CB4003-E5C9-48CE-99E2-3FDADD3A77EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9CB4003-E5C9-48CE-99E2-3FDADD3A77EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9CB4003-E5C9-48CE-99E2-3FDADD3A77EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9CB4003-E5C9-48CE-99E2-3FDADD3A77EE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C8D926CE-1AB2-445C-B182-BB47EB0E0CFF}
+	EndGlobalSection
+EndGlobal
