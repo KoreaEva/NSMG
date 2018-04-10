@@ -18,7 +18,6 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 
 ## Artchitecture
 
-## 기술 검증
 ![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Artchitecture.png?raw=true)<br>
 
 ### 1. EventHubs Client
@@ -563,13 +562,7 @@ namespace NSMGFunc.Helpers
     }
 }
 ```
-### 10.CosmosDB
-
-### 4. MySQL to SQL data migration 
-
-### 5. SQL Utility library
-
-### 6. Cosmos DB
+### 10.CosmosDB (Http Collection)
 
 Cosmos DB에 저장하기 위해서는 Database를 먼저 생성하고 JSON Document를 저장할 수 있는 Collection을 생성해야 한다. 실제 저장은 Collection에 이루어지는데 Collection도 10Gbyte 한계가 있는 버전과 Unlimited 버전이 존재한다. Unlimited을 사용할 때에는 사실상 RU의 제약이 없이 사용할 수 있으며 또 RU의 제한을 넘어서 사용하는 것도 별도의 요청을 통해서 가능하게 되어 있다. 반대로 10Gbyte의 한계가 있는 버전의 경우에는 10,000 RU가 한계다. 그래서 NSMG의 요구사항을 수용하기 위해서는 Unlimited Collection을 사용하게 되었다. 
 
