@@ -256,12 +256,19 @@ EventHub를 사용할 때 EventHub의 처리량은 충분한데 Partition에서 
 ### 4. Stream Analytics Job
 
 EventHub 에서 제공하는 Capture기능을 사용하면 EventHub로 들어오는 데이터를 Blob storage에 백업할 수 있다. 
-
+![EventHub Capture](https://github.com/KoreaEva/NSMG/blob/master/Images/EventHub_capture.png?raw=true)<br>
 하지만 실제로 테스트 해보니 한글이 깨지고 Line단위로 분할하는 등의 기능이 미해서 결국 중간에 Stream Analytics Job을 사용해서 저장하기로 했다.
 또 필요에 따라서 추가적인 데이터의 흐름이 필요할 수도 있어서 Stream Analytics를 사용하게 되었다. 
 
 
-### 3. Azure Functions (EventHub Trigger)
+### 5. Blob Storage
+
+Stream analytics job에서 들어온 데이터를 저장하기 위해서 제공되는 Blob Storage이다. 
+별다른 기능은 없다. 여기서 수집된 원본데이터는 추후 데이터 분석을 위해서 활용된다. 
+
+### 6. Azure Functions (Http Trigger)
+
+### 6. Azure Functions (EventHub Trigger)
 
 EventHub를 사용하게 되면서 Azure Functions도 역시 EventHub Trigger를 사용하게 되었다. 
 
