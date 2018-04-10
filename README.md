@@ -260,7 +260,6 @@ EventHub 에서 제공하는 Capture기능을 사용하면 EventHub로 들어오
 하지만 실제로 테스트 해보니 한글이 깨지고 Line단위로 분할하는 등의 기능이 미해서 결국 중간에 Stream Analytics Job을 사용해서 저장하기로 했다.
 또 필요에 따라서 추가적인 데이터의 흐름이 필요할 수도 있어서 Stream Analytics를 사용하게 되었다. 
 
-
 ### 5. Blob Storage
 
 Stream analytics job에서 들어온 데이터를 저장하기 위해서 제공되는 Blob Storage이다. 
@@ -268,21 +267,281 @@ Stream analytics job에서 들어온 데이터를 저장하기 위해서 제공�
 
 ### 6. Azure Functions (Http Trigger)
 
-### 6. Azure Functions (EventHub Trigger)
-
-EventHub를 사용하게 되면서 Azure Functions도 역시 EventHub Trigger를 사용하게 되었다. 
+Http trigger를 사용하는 Azure Functions의 경우 단순한 입력에 활용된다. Http Trigger를 통해서 입력받은 Json 내용을 그대로 Cosmos DB에 입력하는 코드로 필요하다면 여기에 기능을 추가할 수 있는 수준의 기본적인 코드를 완성 했다. 
 
 ```csharp
-    public static class EventHubWifi
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Host;
+
+using System;
+using Microsoft.Azure.Documents;
+using Microsoft.Azure.Documents.Client;
+using Newtonsoft.Json;
+using Newtonsoft;
+using Newtonsoft.Json.Serialization;
+using Newtonsoft.Json.Linq;
+
+namespace NSMGFunc
+{
+    public static class FuncHttp
     {
-        [FunctionName("EventHubWifi")]
-        public static void Run([EventHubTrigger("wifi", Connection = "WIFI")]string myEventHubMessage, TraceWriter log)
+        //CosmosDB와 관련된 환경 변수들을 가져오는 코드
+        static private string CosmosWifiEndpointUrl = Environment.GetEnvironmentVariable("CosmosWifiEndpoint");
+        static private string CosmosPrimaryKey = Environment.GetEnvironmentVariable("CosmosWifiPrimaryKey");
+        private static DocumentClient client = new DocumentClient(new Uri(CosmosWifiEndpointUrl), CosmosPrimaryKey);
+
+        private static string DatabaseName = Environment.GetEnvironmentVariable("CosmosWifiDatabase");
+        private static string DataCollectionName = Environment.GetEnvironmentVariable("CosmosHttpCollection");
+
+        [FunctionName("FuncHttp")]
+        public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)]HttpRequestMessage req, TraceWriter log)
         {
-            log.Info($"C# Event Hub trigger function processed a message: {myEventHubMessage}");
+            log.Info("C# HTTP trigger function processed a request.");
+
+            //Cosmos DB Database와 Collection이 없으면 생성하는 부분 추후 서비스가 안정되면 삭제될 코드
+            await client.CreateDatabaseIfNotExistsAsync(new Database { Id = DatabaseName });
+            await client.CreateDocumentCollectionIfNotExistsAsync(UriFactory.CreateDatabaseUri(DatabaseName), new DocumentCollection { Id = DataCollectionName });
+
+            // parse query parameter
+            string message = req.GetQueryNameValuePairs()
+                .FirstOrDefault(q => string.Compare(q.Key, "message", true) == 0)
+                .Value;
+
+            if (message == null)
+            {
+                // Get request body
+                dynamic data = await req.Content.ReadAsAsync<object>();
+                message = data?.name;
+            }
+
+            if (message != null || message != "")
+            {
+                //전달받은 JSON을 기반으로 HttpModel 클래스를 만들고 고유 아이디를 첨부하는 부분
+                JObject jobjct = JObject.Parse(message);
+                Models.HttpModel httpModel = new Models.HttpModel();
+                httpModel.id = generateID();
+                httpModel.jobject = jobjct;
+
+                //CosmosDB에 입력하는 코드
+                await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseName, DataCollectionName), httpModel);
+            }
+
+            return message == null
+                ? req.CreateResponse(HttpStatusCode.BadRequest, "Please pass a name on the query string or in the request body")
+                : req.CreateResponse(HttpStatusCode.OK, "Hello " + message);
         }
+
+        /// 문서의 고유한 ID를 생성하는 함수
+        public static string generateID()
+        {
+            return string.Format("{0}_{1:N}", System.DateTime.Now.Ticks, Guid.NewGuid());
+        }
+
     }
+}
 ```
-Azure Functions를 사용할 때에 주의 할 점은 실제 가동중인 Azure Functions와 Local에서 개발중인 Azure Functions의 storage를 같은 서비스로 지정하게 되면 Connection limit가 초과 되었다는 메시지와 함께 실행되지 않는 경우가 있다. 
+위의 코드에서 사용할 데이터 구조를 위해서 Entity Class를 추가했다. 
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using Newtonsoft.Json.Linq;
+
+namespace NSMGFunc.Models
+{
+    public class HttpModel
+    {
+        public string id { get; set; }
+        public JObject jobject { get; set; }
+    }
+}
+```
+
+### 7. Cosmos DB
+
+CosmosDB에서 새로운 Collection을 생성할 때 추가적인 지정을 하지 않으면 기본 용량은 10GB로 Fixed되고 기본 RU는 400이 지정된다. 따라서 RU는 추가적으로 확장이 가능하지만 용량은 고정되기 때문에 지속적으로 용량의 확정이 예상되는 경우에는 코드에서 생성하기 보다는 미리 포털에서 생성해 놓는 것이 좋다. 
+
+![HttpCollection](https://github.com/KoreaEva/NSMG/blob/master/Images/HttpCollection.png?raw=true)
+
+### 8. Azure Functions (EventHub Trigger)
+
+EventHub를 사용하게 되면서 Azure Functions도 역시 EventHub Trigger를 사용하게 되었다. EventHub에서 전달되는 내용을 그냥 저장만 할 경우에는 역시 중간에 Stream Analytics Job을 추가하는 것으로 간단히 해결할 수 있겠지만 이번에는 넘어오는 데이터들을 SQL Server에서 조회하고 조회된 결과를 반영해서 CosmosDB에 저장해야 하기 때문에 EventHub Trigger로 Azure Functions을 사용하게 되었다. 
+
+```csharp
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Host;
+using Microsoft.Azure.WebJobs.ServiceBus;
+
+using System;
+using System.Net;
+using Microsoft.Azure.Documents;
+using Microsoft.Azure.Documents.Client;
+using Newtonsoft.Json;
+using Newtonsoft;
+using Newtonsoft.Json.Serialization;
+using Newtonsoft.Json.Linq;
+
+using System.Data;
+using System.Data.SqlClient;
+
+namespace NSMGFunc
+{
+    public static class FuncWifi
+    {
+        //CosmosDB와 관련된 환경 변수들을 가져오는 코드
+        static private string CosmosWifiEndpointUrl = Environment.GetEnvironmentVariable("CosmosWifiEndpoint");
+        static private string CosmosPrimaryKey = Environment.GetEnvironmentVariable("CosmosWifiPrimaryKey");
+        private static DocumentClient client =   new DocumentClient(new Uri(CosmosWifiEndpointUrl), CosmosPrimaryKey);
+
+        private static string DatabaseName = Environment.GetEnvironmentVariable("CosmosWifiDatabase");
+        private static string DataCollectionName = Environment.GetEnvironmentVariable("CosmosWifiCollection");
+
+        [FunctionName("FuncWifi")]
+        public async static void Run([EventHubTrigger("wifi", Connection = "NSMGEventHub")]string myEventHubMessage, TraceWriter log)
+        {
+            //Cosmos DB Database와 Collection이 없으면 생성하는 부분 추후 서비스가 안정되면 삭제될 코드
+            await client.CreateDatabaseIfNotExistsAsync(new Database { Id = DatabaseName });
+            await client.CreateDocumentCollectionIfNotExistsAsync(UriFactory.CreateDatabaseUri(DatabaseName), new DocumentCollection { Id = DataCollectionName });
+            JArray array = JArray.Parse(myEventHubMessage);
+
+            for(int i=0;i<array.Count;i++)
+            {
+                string bssid = (string)array[i]["bssid"];
+                string ssid = (string)array[i]["ssid"];
+
+                System.Data.SqlClient.SqlParameter[] para = {
+                    new System.Data.SqlClient.SqlParameter("bssid", SqlDbType.NVarChar, 17),
+                    new System.Data.SqlClient.SqlParameter("ssid", SqlDbType.NVarChar, 50)
+                };
+
+                para[0].Value = bssid;
+                para[1].Value = ssid;
+
+                //SQL Database에서 데이터를 조회하고 조회된 내용을 반영하는 부분
+                DataSet ds = Helpers.SQLHelper.RunSQL("SELECT * FROM dbo.bssids WHERE bssid =@bssid AND ssid=@ssid", para);
+                if (ds.Tables[0].Rows.Count != 0)
+                {
+                    DataRow row = ds.Tables[0].Rows[0];
+                    array[i]["keyword"] = row[14].ToString();
+                    array[i]["address"] = row[11].ToString();
+                }
+            }
+
+            //WIFI Models
+            Models.WifiModel wifiModel = new Models.WifiModel();
+            wifiModel.id = generateID();
+            wifiModel.wifies = array;
+
+            await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseName, DataCollectionName), wifiModel);
+            
+            //성능 개선을 위해서 log를 출력하는 코드는 주석 처리 되었다. 
+            //log.Info($"C# Event Hub trigger function processed a message: {myEventHubMessage}");
+        }
+
+        /// 문서의 고유ID를 생성하는 코드
+        public static string generateID()
+        {
+            return string.Format("{0}_{1:N}", System.DateTime.Now.Ticks, Guid.NewGuid());
+        }
+
+    }
+}
+```
+
+### 9. SQL Database
+여기서 사용되는 SQL Database는 주로 낮에는 읽기 전용으로 사용하게 될 예정이기 때문에 생각보다 부하가 많이 걸리지는 않을 것으로 예상된다. 입력 혹은 업데이트 작업은 새벽시간을 이용해서 배치 작업으로 수행하게 된다. SQL Database를 다루게 될때 단순 반복적인 코드를 작성하게 되는데 이를 피하기 위해서 Helper 클래스를 생성해서 활용 했다. 
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+using System.Data;
+using System.Data.SqlClient;
+
+namespace NSMGFunc.Helpers
+{
+    public static class SQLHelper
+    {
+        private static string SQLConnectString = Environment.GetEnvironmentVariable("SQLDatabaseEndpoint");
+
+        public static DataSet RunSQL(string query)
+        {
+            DataSet ds = new DataSet();
+
+            SqlConnection con = new SqlConnection(SQLConnectString);
+            SqlCommand cmd = new SqlCommand(query, con);
+            SqlDataAdapter adapter = new SqlDataAdapter(cmd);
+
+            adapter.Fill(ds);
+
+            return ds;
+        }
+
+        public static DataSet RunSQL(string query, SqlParameter[] para)
+        {
+            DataSet ds = new DataSet();
+
+            SqlConnection con = new SqlConnection(SQLConnectString);
+            SqlCommand cmd = new SqlCommand(query, con);
+            SqlDataAdapter adapter = new SqlDataAdapter(cmd);
+
+            //파라메터의 반영
+            cmd.Parameters.Clear();
+            foreach (SqlParameter p in para)
+            {
+                cmd.Parameters.Add(p);
+            }
+
+            adapter.Fill(ds);
+
+            return ds;
+        }
+
+        public static void ExecuteNonQuery(string query)
+        {
+            DataSet ds = new DataSet();
+
+            SqlConnection con = new SqlConnection(SQLConnectString);
+            SqlCommand cmd = new SqlCommand(query, con);
+
+            con.Open();
+            cmd.ExecuteNonQuery();
+            con.Close();
+        }
+
+        public static void ExecuteNonQuery(string query, SqlParameter[] para)
+        {
+            DataSet ds = new DataSet();
+
+            SqlConnection con = new SqlConnection(SQLConnectString);
+            SqlCommand cmd = new SqlCommand(query, con);
+
+            //파라메터의 반영
+            cmd.Parameters.Clear();
+            foreach (SqlParameter p in para)
+            {
+                cmd.Parameters.Add(p);
+            }
+
+            con.Open();
+            cmd.ExecuteNonQuery();
+            con.Close();
+        }
+
+    }
+}
+```
+### 10.CosmosDB
 
 ### 4. MySQL to SQL data migration 
 
@@ -368,137 +627,8 @@ Cosmos DB에 필요한 RU를 계산해 볼 수 있는 사이트 [https://www.doc
 Cosmos DB개발 참조링크
 [https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started](https://docs.microsoft.com/ko-kr/azure/cosmos-db/sql-api-get-started)<br>
 
-### 7. Azure Batch
+### 10. CosmosDB (Wifi Collectiion)
 
-### 8. Azure Search
+![Wifi Collection](https://github.com/KoreaEva/NSMG/blob/master/Images/WifiCollection.png?raw=true)
 
-### 9. Azure Functions(Http Trigger)
-
-
-## 프로젝트 코드
-
-## Collaboration Tool
-
-[NSMG Hackfest Slack](http://nsmg-hackfest.slack.com)<br>
-[One Drive](https://1drv.ms/f/s!AosfFsO-w03gjnOhsZl1McXhzLP4)
-
-
-## Azure Services
-
-[Azure Web App](https://docs.microsoft.com/ko-kr/azure/app-service/app-service-web-overview)<br>
-[IoT Hub](https://docs.microsoft.com/ko-kr/azure/iot-hub/)<br>
-[Stream Analytics Job](https://docs.microsoft.com/ko-kr/azure/stream-analytics/)<br>
-[Azure Storage Account](https://docs.microsoft.com/ko-kr/azure/storage/common/storage-introduction)<br>
-[SQL Database](https://docs.microsoft.com/ko-kr/azure/sql-database/sql-database-technical-overview)<br>
-[Azure Functions](https://docs.microsoft.com/ko-kr/azure/azure-functions/functions-overview)<br>
-[Cosmos DB](https://docs.microsoft.com/ko-kr/azure/cosmos-db/introduction)
-
-## 관련 문서 
-
-
-## 사용을 예상했으나 사용되지 않은 서비스 
-
-
-
-### 1. IoT Hub Dummy --> Android Client
-
-IoT Hub Dummy를 사용해서 대량의 데이터를 전송하는 것을 시도했으나 충분한 트래픽을 발생시키는 데에는 1개의 클라이언트에서 한계가 있었고 또 네트웍등의 문제가 발생하는 것을 확인했다. 
- 또 IoT Hub가 비용적인 문제와 좀 더 유연한 확장을 위해서 Azure Storage Account에서 제공하는 Queue를 사용하게 되면서 아래의 Iot Hub Dummy는 사용하지 않게 되었다. 대신 Android Client를 만들어서 테스트하게 되었으며 Android Client는 Queue에 직접 통신하게 되었다. 
-
- #### Android Client
- <내용 추가>
-
- #### IoT Hub Dummy (사용하지 않음)
-
-테스트르 위해서 충분한 숫자의 데이터 패킷을 발생시키기 위한 더미 소스 입니다.<br> 
-[IoTHub Sensor Data Dummy C# Source Code](https://github.com/KoreaEva/NSMG/tree/master/Samples/IoTHubDataSender)<br>
-
-사용하기 위해서는 실행 파일에서 아래와 같이 실행하게 되면 5초단위로 1개의 인스턴스에서 패킷을 발송하게 됩니다. <br>
-IoTHubDataSender 5000 1<br>
-
-충분한 숫자의 패킷을 발송하기 위해서는 IoTHubDataSender 1 5000 이렇게 실행시키면 1000/1 초 단위로 5000천개의 인스턴스에서 패킷을 발송하게 됩니다. <br>
-지금은 온도, 습도, 미세먼지 값등을 더미로 발생시켜서 보내고 있다. 실제 데이터로 바꾸기 위해서는 아래 두 개의 파일을 수정해야 한다. <br>
-
-WeatherModel.cs //데이터 모델<br>
-DummySensor.cs  //난수 발생기 <br>
-
-### 2. Azure Storage Queue
-
-Azure Storage Queue와 관련된 자세한 내용은 [https://azure.microsoft.com/ko-kr/services/storage/queues/](https://azure.microsoft.com/ko-kr/services/storage/queues/
-)에서 확인 할 수 있다. 
-
-![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Queues.png?raw=true)<br>
-
-여기서는 초당 5000개 이상의 요청을 처리하기 위해서 10개의 Queue를 사용 하고 있다. 그리고 각각의 Queue에는 Queue Trigger 담당하는 Azure Functions들을 연결해서 들어오는 요청을 처리 할 수 있게 했다. 
-
-Queue의 제약은 아래와 같다. 
-Azure Storage Account 초당 20,000 호출<br>
-Azure Storage Queue 초당 2,000 호출<br>
-
-### 2. IoT Hub Trigger
-
-![IoT Hub Setting](https://github.com/KoreaEva/NSMG/blob/master/Images/IoTHubTriggerSetting.png?raw=true)
-<br>
-
-IoT Hub Trigger를 사용하기 위해서는 EndPoint에 지정된 값들을 소스에 반영해서 코딩해야 한다. 
-
-```csharp
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Host;
-using Microsoft.Azure.WebJobs.ServiceBus;
-
-namespace IoTHubTrigger
-{
-    public static class IoTHubTrigger
-    {
-        [FunctionName("IoTHubTrigger")]
-        public static void Run([EventHubTrigger("nsmgiothub", Connection = "IoTHubConnection")]string myEventHubMessage, TraceWriter log)
-        {
-            log.Info($"C# Event Hub trigger function processed a message: {myEventHubMessage}");
-        }
-    }
-}
-```
-
-### 3. Blob Trigger
-Blob Trigger의 경우 Blob안에 저장되어 있는 파일의 Stream이 리턴된다. 따라서 업데이트 되는 부분만 추출하기 위해서는 마지막 라인만 가져오는 방법이 필요하다. 
- 어떻게 해도 파일 단위의 작업이기 때문에 불가피하게 오버해드가 발생 된다. 그래서 Batch 작업등에서만 사용하는 것이 적절한 방법으로 판단된다. 
-개별적인 업데이트 내용을 핸들링 하기 위해서는 IoTHub Trigger를 사용하는 것이 적합해 보인다. 
-
-```csharp
-    public static class BlobTriggerJson
-    {
-        [FunctionName("BlobTriggerJson")]
-        public static void Run([BlobTrigger("tempdata/{name}", Connection = "BlobStorage")]Stream myBlob, string name, TraceWriter log)
-        {
-            StreamReader sr = new StreamReader(myBlob);
-
-            string temp = sr.ReadLine(); //이렇게 하면 첫째 줄만 계속 읽게 되면 그래서 sr.ReadToEnd()를 사용해야 하는데 그럼 사이즈가 커지면 심각한 오버해드가 발생할 예정.
-
-            JObject json = JObject.Parse(temp);
-
-            log.Info($"DeviceID: {json.Last["DeviceID"].ToString()} Temperature: {json.Last["Temperature"].ToString()} Humidity: {json.Last["Humidity"].ToString()}");
-            
-            //log.Info($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {myBlob.Length} Bytes");
-        }
-    }
-```
-
-### 4. Timer Trigger
-
-Timer setting 방법 [https://gs.saro.me/#!m=elec&jn=866](https://gs.saro.me/#!m=elec&jn=866)<br>
-
-```csharp
-    public static class TimerTrigger
-    {
-        [FunctionName("TimerTrigger")]
-        public static void Run([TimerTrigger("0/10 * * * * *")]TimerInfo myTimer, TraceWriter log)
-        {
-            log.Info($"C# Timer trigger function executed at: {DateTime.Now}");
-        }
-    }
-```
-
-### 6. Log Analytics
-
-일반적인 용도로 사용할 수 없어서 제외되었다.
+Wifi쪽은 트래픽이나 데이터의 양이 모두 많기 때문에 포털에서 직접 생성했다. RU는 30000으로 설정해 두었고 용량은 Unlimited로 설정했다. 하지만 최장 3개월 데이터만 저장될 예정이기 때문에 큰 문제는 없을 것으로 예상된다. 

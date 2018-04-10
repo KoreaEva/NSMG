@@ -1,4 +1,4 @@
-using Microsoft.Azure.WebJobs;
+ï»¿using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.ServiceBus;
 
@@ -18,6 +18,7 @@ namespace NSMGFunc
 {
     public static class FuncWifi
     {
+        //CosmosDBì™€ ê´€ë ¨ëœ í™˜ê²½ ë³€ìˆ˜ë“¤ì„ ê°€ì ¸ì˜¤ëŠ” ì½”ë“œ
         static private string CosmosWifiEndpointUrl = Environment.GetEnvironmentVariable("CosmosWifiEndpoint");
         static private string CosmosPrimaryKey = Environment.GetEnvironmentVariable("CosmosWifiPrimaryKey");
         private static DocumentClient client =   new DocumentClient(new Uri(CosmosWifiEndpointUrl), CosmosPrimaryKey);
@@ -28,7 +29,7 @@ namespace NSMGFunc
         [FunctionName("FuncWifi")]
         public async static void Run([EventHubTrigger("wifi", Connection = "NSMGEventHub")]string myEventHubMessage, TraceWriter log)
         {
-            //Cosmos DB Database¿Í CollectionÀÌ ¾øÀ¸¸é »ı¼ºÇÏ´Â ÄÚµå ¼­ºñ½º°¡ ¾ÈÁ¤µÇ¸é »èÁ¦ÇÒ ÄÚµå
+            //Cosmos DB Databaseì™€ Collectionì´ ì—†ìœ¼ë©´ ìƒì„±í•˜ëŠ” ë¶€ë¶„ ì¶”í›„ ì„œë¹„ìŠ¤ê°€ ì•ˆì •ë˜ë©´ ì‚­ì œë  ì½”ë“œ
             await client.CreateDatabaseIfNotExistsAsync(new Database { Id = DatabaseName });
             await client.CreateDocumentCollectionIfNotExistsAsync(UriFactory.CreateDatabaseUri(DatabaseName), new DocumentCollection { Id = DataCollectionName });
             JArray array = JArray.Parse(myEventHubMessage);
@@ -46,10 +47,8 @@ namespace NSMGFunc
                 para[0].Value = bssid;
                 para[1].Value = ssid;
 
-                //SQL Database¿¡ Á¤º¸¸¦ MatchingÇÏ´Â ºÎºĞ
+                //SQL Databaseì—ì„œ ë°ì´í„°ë¥¼ ì¡°íšŒí•˜ê³  ì¡°íšŒëœ ë‚´ìš©ì„ ë°˜ì˜í•˜ëŠ” ë¶€ë¶„
                 DataSet ds = Helpers.SQLHelper.RunSQL("SELECT * FROM dbo.bssids WHERE bssid =@bssid AND ssid=@ssid", para);
-
-                //°á°ú°¡ ÀÖÀ¸¸é Address¿Í Keyword¸¦ ¾÷µ¥ÀÌÆ® ÇÑ´Ù. 
                 if (ds.Tables[0].Rows.Count != 0)
                 {
                     DataRow row = ds.Tables[0].Rows[0];
@@ -65,11 +64,11 @@ namespace NSMGFunc
 
             await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseName, DataCollectionName), wifiModel);
             
-            //¼º´ÉÇâ»óÀ» À§ÇØ¼­ Log Ãâ·ÂÀº ÁÖ¼®Ã³¸®
+            //ì„±ëŠ¥ ê°œì„ ì„ ìœ„í•´ì„œ logë¥¼ ì¶œë ¥í•˜ëŠ” ì½”ë“œëŠ” ì£¼ì„ ì²˜ë¦¬ ë˜ì—ˆë‹¤. 
             //log.Info($"C# Event Hub trigger function processed a message: {myEventHubMessage}");
         }
 
-        /// ¹®¼­ÀÇ °íÀ¯ÀÌ¸§ »ı¼ºÇÏ±â À§ÇÑ ¸Ş¼Òµå
+        /// ë¬¸ì„œì˜ ê³ ìœ IDë¥¼ ìƒì„±í•˜ëŠ” ì½”ë“œ
         public static string generateID()
         {
             return string.Format("{0}_{1:N}", System.DateTime.Now.Ticks, Guid.NewGuid());
