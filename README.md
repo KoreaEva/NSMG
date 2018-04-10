@@ -456,6 +456,28 @@ namespace NSMGFunc
 }
 ```
 
+Wifi데이터를 Seiralize하기 위해서 Entity 클래스를 별도로 추가했다. 
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using Newtonsoft.Json.Linq;
+
+namespace NSMGFunc.Models
+{
+    public class WifiModel
+    {
+        public string id { get; set; }
+        public JArray wifies { get; set; }
+    }
+}
+```
+
+
 ### 9. SQL Database
 여기서 사용되는 SQL Database는 주로 낮에는 읽기 전용으로 사용하게 될 예정이기 때문에 생각보다 부하가 많이 걸리지는 않을 것으로 예상된다. 입력 혹은 업데이트 작업은 새벽시간을 이용해서 배치 작업으로 수행하게 된다. SQL Database를 다루게 될때 단순 반복적인 코드를 작성하게 되는데 이를 피하기 위해서 Helper 클래스를 생성해서 활용 했다. 
 
