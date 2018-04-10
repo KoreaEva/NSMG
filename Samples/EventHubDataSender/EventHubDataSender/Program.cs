@@ -15,7 +15,7 @@ namespace IoTHubDataSender
         private static DummySensor Sensor = new DummySensor();
         private static int Duration = 1000;
 
-        private const string EventHubConnectionString = "Endpoint=sb://nsmgeventhub.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=uqC11Xtp5syZy0QF7jFGwDfJO4wgEaCxYyuX5Khrr0U=";
+        private const string EventHubConnectionString = "<EventHub ConnectionString>";
         private const string EventHub = "wifi";
         private static EventHubClient eventHubClient;
 
@@ -45,7 +45,9 @@ namespace IoTHubDataSender
 
         static async Task SendEvent()
         {
-            string json = Newtonsoft.Json.JsonConvert.SerializeObject(Sensor.GetWetherData("Device1"));
+            //string json = Newtonsoft.Json.JsonConvert.SerializeObject(Sensor.GetWetherData("Device1"));
+
+            string json = System.IO.File.ReadAllText(@"C:\Users\yowkim\Documents\sample.txt");
 
             await eventHubClient.SendAsync(new EventData(Encoding.UTF8.GetBytes(json)));
             Console.WriteLine(json);
