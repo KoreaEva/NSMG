@@ -21,7 +21,7 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 ![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Artchitecture.png?raw=true)<br>
 
 최종 아키텍쳐가 나오기 까지 우여곡절이 많았다. 중간단계의 아키텍쳐는 아래 링크에 정리해 두었다. 
-[https://github.com/KoreaEva/NSMG/blob/master/ArchtectureList.md?raw=true](https://github.com/KoreaEva/NSMG/blob/master/ArchtectureList.md?raw=true)<br>
+[https://github.com/KoreaEva/NSMG/blob/master/ArchtectureList.md](https://github.com/KoreaEva/NSMG/blob/master/ArchtectureList.md)<br>
 
 ### 1. EventHubs Client
 
