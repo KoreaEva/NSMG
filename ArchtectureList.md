@@ -9,7 +9,7 @@ NSMG의 요구사항은 다음과 같이 정리 할 수 있다.
 이와 같은 요구사항을 바탕으로 아래와 같이 다양한 버전의 아키텍쳐를 검토했다. 
 
 ## 1. IoTHub를 이용한 구성
-![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Artchitecture/1.png?raw=true)<br>
+![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Artchitecture/1.PNG?raw=true)<br>
 
 IoT Hub를 사용한 구성을 처음에 구성했을 때에는 클라이언트의 안드로이드 디바이스에 메시지를 Push하기 위해서 IoTHub를 사용하는 것으로 구성했다. 최종 결과물은 CosmosDB에 저장하는 것으로 지정했다. 이 구성이 AWS에서 제공하는 기능에 비해서 가장 큰 장점은 IoT Hub에 동시 접속 가능한 디바이스의 수에 제한이 없다는 것이다. 하지만 초당 5000건을 처리하기 위해서는 IoT Hub 중에서도 상대적으로 비싼 사이즈의 서비스를 사용해야 했고 또 초당 5000건의 데이터를 Azure Functions의 Timer Trigger를 사용한다면 Azure Fucntions의 가동 시간이 길어져 사용 비용의 증가가 예상되는 등의 문제가 있었다. 
 
