@@ -20,6 +20,9 @@ NSMG와 Hackfest를 위해서 만든 Repository 입니다.
 
 ![Artchitecture](https://github.com/KoreaEva/NSMG/blob/master/Images/Artchitecture.png?raw=true)<br>
 
+최종 아키텍쳐가 나오기 까지 우여곡절이 많았다. 중간단계의 아키텍쳐는 아래 링크에 정리해 두었다. 
+[https://github.com/KoreaEva/NSMG/blob/master/ArchtectureList.md?raw=true](https://github.com/KoreaEva/NSMG/blob/master/ArchtectureList.md?raw=true)<br>
+
 ### 1. EventHubs Client
 
  EventHub에 연결하기 위해서는 두 가지 방법 중 하나를 선택할 수 있다. 첫 번째 방법은 제공되는 패키지를 이용하는 방법이고 두 번째는 REST를 이용하는 연결 방법이다. 이번 Hackfest에서는 두 가지 방법을 모두 테스트 했다. 패키지를 이용하는 방법은 Nuget 을 사용하는 Console App으로 제작해서 테스트용 더미 클라이언트를 만드는데 사용했다. 
